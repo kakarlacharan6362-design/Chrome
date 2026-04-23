@@ -108,7 +108,7 @@ Try {
     [String]$appVendor = 'Google'
     [String]$appName = 'Chrome'
     [String]$appVersion = '147.0.7727.56'
-    [String]$AppRequestID = 'LUM0190'
+    [String]$AppRequestID = ''
     [String]$appArch = 'x64'
     [String]$appLang = 'EN'
     [String]$appRevision = 'R01'
@@ -117,8 +117,8 @@ Try {
     [String]$appScriptAuthor = 'Charan k'
     ##*===============================================
     ## Variables: Install Titles (Only set here to override defaults set by the toolkit)
-    [String]$installName = 'LUM0190_Google_Chrome_147.0.7727.56-R01_EN'
-    [String]$installTitle = 'LUM0190_Google_Chrome_147.0.7727.56-R01_EN'
+    [String]$installName = '_Google_Chrome_147.0.7727.56-R01_EN'
+    [String]$installTitle = '_Google_Chrome_147.0.7727.56-R01_EN'
 
     ##* Do not modify section below
     #region DoNotModify
@@ -190,16 +190,16 @@ Try {
 
 
         $registryPaths = @(
-                "HKLM:\SYSTEM\LUMILEDS\Packages\Google Chrome 128.0.6613.120",
-                "HKLM:\SYSTEM\LUMILEDS\Packages\Google Chrome 130.0.6723.92",
-                "HKLM:\SYSTEM\LUMILEDS\Packages\Google Chrome 132.0.6834.84",
-                "HKLM:\SYSTEM\LUMILEDS\Packages\Google Chrome 135.0.7049.96",
-                "HKLM:\SYSTEM\LUMILEDS\Packages\Google Chrome 137.0.7151.69",
-                "HKLM:\SYSTEM\LUMILEDS\Packages\Google Chrome 139.0.7258.139",
-                "HKLM:\SYSTEM\LUMILEDS\Packages\Google Chrome 140.0.7339.186",
-                "HKLM:\SYSTEM\LUMILEDS\Packages\Google Chrome 142.0.7444.163",
-                "HKLM:\SYSTEM\LUMILEDS\Packages\Google Chrome 144.0.7559.110",
-                "HKLM:\SYSTEM\LUMILEDS\Packages\Google Chrome 145.0.7632.76"
+                "HKLM:\SYSTEM\Packages\Google Chrome 128.0.6613.120",
+                "HKLM:\SYSTEM\Packages\Google Chrome 130.0.6723.92",
+                "HKLM:\SYSTEM\Packages\Google Chrome 132.0.6834.84",
+                "HKLM:\SYSTEM\Packages\Google Chrome 135.0.7049.96",
+                "HKLM:\SYSTEM\Packages\Google Chrome 137.0.7151.69",
+                "HKLM:\SYSTEM\Packages\Google Chrome 139.0.7258.139",
+                "HKLM:\SYSTEM\Packages\Google Chrome 140.0.7339.186",
+                "HKLM:\SYSTEM\Packages\Google Chrome 142.0.7444.163",
+                "HKLM:\SYSTEM\Packages\Google Chrome 144.0.7559.110",
+                "HKLM:\SYSTEM\Packages\Google Chrome 145.0.7632.76"
             )
  
             foreach ($registryPath in $registryPaths) {
@@ -329,7 +329,7 @@ Try {
                 Write-Log -Message "Now GoogleUpdate.exe is not running in the machine..."
 
                 # Execute installation
-                Execute-MSI -Action 'Install' -Path "$dirFiles\googlechromestandaloneenterprise64.msi" -Transform "$dirFiles\Google_Chrome_147.0.7727.56-R01_EN.Mst" -Parameters '/qn' -LogName "LUM0190_Google_Chrome_147.0.7727.56-R01_EN"
+                Execute-MSI -Action 'Install' -Path "$dirFiles\googlechromestandaloneenterprise64.msi" -Transform "$dirFiles\Google_Chrome_147.0.7727.56-R01_EN.Mst" -Parameters '/qn' -LogName "_Google_Chrome_147.0.7727.56-R01_EN"
                     
 
             }
@@ -350,7 +350,7 @@ Try {
             {
             # Chrome is not installed
             Write-Log -Message "Google Chrome is not installed. Starting installation..."
-            Execute-MSI -Action 'Install' -Path "$dirFiles\googlechromestandaloneenterprise64.msi" -Transform "$dirFiles\Google_Chrome_147.0.7727.56-R01_EN.Mst" -Parameters '/qn' -LogName "LUM0190_Google_Chrome_147.0.7727.56-R01_EN"
+            Execute-MSI -Action 'Install' -Path "$dirFiles\googlechromestandaloneenterprise64.msi" -Transform "$dirFiles\Google_Chrome_147.0.7727.56-R01_EN.Mst" -Parameters '/qn' -LogName "_Google_Chrome_147.0.7727.56-R01_EN"
             }
             
 
@@ -436,7 +436,7 @@ Try {
             if (Test-Path -Path $Path) {
                 Get-ChildItem $Path | Where-Object $UninstallSearchFilter | 
                 ForEach-Object {
-                Execute-MSI -Action 'Uninstall' -Path "$($_.PSChildName)" -Parameters '/qn' -LogName "LUM0190_Google_Chrome_147.0.7727.56-R01_EN"                     
+                Execute-MSI -Action 'Uninstall' -Path "$($_.PSChildName)" -Parameters '/qn' -LogName "_Google_Chrome_147.0.7727.56-R01_EN"                     
 
                 }
             }
