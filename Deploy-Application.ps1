@@ -106,19 +106,18 @@ Try {
     ##*===============================================
     ## Variables: Application
     [String]$appVendor = 'Google'
-    [String]$appName = 'Chrome'
-    [String]$appVersion = '147.0.7727.56'
-    [String]$AppRequestID = ''
-    [String]$appArch = 'x64'
+    [String]$appName = 'ChromeBeta'
+    [String]$appVersion = '147.0.7727.3'
+    [String]$appArch = ''
     [String]$appLang = 'EN'
-    [String]$appRevision = 'R01'
-    [String]$appScriptVersion = ''
-    [String]$appScriptDate = '18-02-2026'
+    [String]$appRevision = ''
+    [String]$appScriptVersion = '1.0.0'
+    [String]$appScriptDate = '13/03/2026'
     [String]$appScriptAuthor = 'Charan k'
     ##*===============================================
     ## Variables: Install Titles (Only set here to override defaults set by the toolkit)
-    [String]$installName = '_Google_Chrome_147.0.7727.56-R01_EN'
-    [String]$installTitle = '_Google_Chrome_147.0.7727.56-R01_EN'
+    [String]$installName = ''
+    [String]$installTitle = ''
 
     ##* Do not modify section below
     #region DoNotModify
@@ -189,30 +188,6 @@ Try {
         ## <Perform Pre-Installation tasks here>
 
 
-        $registryPaths = @(
-                "HKLM:\SYSTEM\Packages\Google Chrome 128.0.6613.120",
-                "HKLM:\SYSTEM\Packages\Google Chrome 130.0.6723.92",
-                "HKLM:\SYSTEM\Packages\Google Chrome 132.0.6834.84",
-                "HKLM:\SYSTEM\Packages\Google Chrome 135.0.7049.96",
-                "HKLM:\SYSTEM\Packages\Google Chrome 137.0.7151.69",
-                "HKLM:\SYSTEM\Packages\Google Chrome 139.0.7258.139",
-                "HKLM:\SYSTEM\Packages\Google Chrome 140.0.7339.186",
-                "HKLM:\SYSTEM\Packages\Google Chrome 142.0.7444.163",
-                "HKLM:\SYSTEM\Packages\Google Chrome 144.0.7559.110",
-                "HKLM:\SYSTEM\Packages\Google Chrome 145.0.7632.76"
-            )
- 
-            foreach ($registryPath in $registryPaths) {
-                if (Test-Path $registryPath) {
-                    Remove-Item -Path $registryPath -Recurse -Force
-                    Write-Log -Message "Registry key removed: $registryPath"
-                } else {
-                    Write-Log -Message "Registry key not found: $registryPath"
-                }
-            }
- 
-
-
         ##*===============================================
         ##* INSTALLATION
         ##*===============================================
@@ -230,129 +205,53 @@ Try {
 
         ## <Perform Installation tasks here>
 
-        
-        # Function to obtain the version of Google Chrome from chrome.exe path
-        function Get-ChromeVersionFromPath {
-            # Define possible Chrome installation paths for both 32-bit and 64-bit systems
-            $chromePaths = @(
-                "$envProgramFiles\Google\Chrome\Application\chrome.exe",
-                "$envProgramFilesX86\Google\Chrome\Application\chrome.exe" # Include 32-bit path if needed
-            )
+        $items = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*","HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" | Where-Object {($_.DisplayName -like "Google Chrome Beta")}
 
-            # Iterate through paths to find the chrome.exe
-            foreach ($chromePath in $chromePaths) {
-                if (Test-Path $chromePath) {
-                    # Get the file version of chrome.exe
-                    $version = (Get-Item $chromePath).VersionInfo.ProductVersion
-                    return $version
-                }
-            }
-
-            # Return empty if Chrome is not installed
-            return ""
-        }
-
-        # Function to compare two versions
-        function Compare-Versions {
-            param (
-                [string]$installedVersion,
-                [string]$requiredVersion
-            )
-
-            # Convert string versions to System.Version type
-            $installed = [version]$installedVersion
-            $required = [version]$requiredVersion
-
-            if ($installed -lt $required) {
-                return -1  # Installed version is lower than the required version
-            } elseif ($installed -eq $required) {
-                return 0   # Installed version matches the required version
-            } else {
-                return 1   # Installed version is higher than the required version
-            }
-        }
-
-        # ChromeVersion:
-        $requiredVersion = "147.0.7727.56" # Define the required version
-        $chromeVersion = Get-ChromeVersionFromPath
-
-        # Check if Google Chrome is installed
-        if ($chromeVersion) {
-            Write-Log -Message "Installed Google Chrome version: $chromeVersion"
-    
-            # Compare the installed version with the required version
-            $comparisonResult = Compare-Versions -installedVersion $chromeVersion -requiredVersion $requiredVersion
-
-             if ($comparisonResult -eq -1) {
-                        Write-Log -Message "Installed version ($chromeVersion) is lower than the required version ($requiredVersion)."
-
-                # Proceed to remove older versions of Google Chrome
-                Write-Log -Message "*************************************************************"
-                Write-Log -Message "Removal of Google Chrome MSI Version started......."
-                Write-Log -Message "*************************************************************"
-
-                $RegUninstallPaths = @(
-                    'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
-                    'HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
-                )
-                $UninstallSearchFilter = { ($_.GetValue('DisplayName') -like '*Google Chrome*') } 
-        
-                foreach ($Path in $RegUninstallPaths) {
-                If (test-path -Path $Path){
-                Get-ChildItem $Path | Where $UninstallSearchFilter | 
-                Foreach {Execute-MSI -Action 'Uninstall' -Path "$($_.PSChildName)" -Parameters '/qn' -LogName "Google_Chrome_PreviousVersion"}
-                write-log -message "Google Chrome Previous version got uninstalled"	
-	
-                }
-                }
-                
-
-                # Kill Chrome if it's running
-                Write-Log -Message "Checking if Chrome is running in the machine..."
-                $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
-                if ($chromeProcesses) {
-                    Write-Log -Message "Chrome.exe is running in the machine..."
-                    Stop-Process -Name "chrome" -Force
-                    Write-Log -Message "Terminated chrome.exe..."
-                }
-                Write-Log -Message "Now Chrome is not running in the machine..."
+        $DisplayVersion = $items.DisplayVersion
+        $GUID = $items.PSChildName
 
 
-                # Kill GoogleUpdate.exe if it's running
-                Write-Log -Message "Checking if GoogleUpdate.exe is running in the machine..."
-                $googleUpdateProcesses = Get-Process -Name "GoogleUpdate" -ErrorAction SilentlyContinue
-                if ($googleUpdateProcesses) {
-                    Write-Log -Message "GoogleUpdate.exe is running in the machine..."
-                    Stop-Process -Name "GoogleUpdate" -Force
-                    Write-Log -Message "Terminated GoogleUpdate.exe..."
-                }
-                Write-Log -Message "Now GoogleUpdate.exe is not running in the machine..."
+        Write-Log -Message "`"$DisplayVersion`" Value"
+        Write-Log -Message "`"$GUID`" Value"
 
-                # Execute installation
-                Execute-MSI -Action 'Install' -Path "$dirFiles\googlechromestandaloneenterprise64.msi" -Transform "$dirFiles\Google_Chrome_147.0.7727.56-R01_EN.Mst" -Parameters '/qn' -LogName "_Google_Chrome_147.0.7727.56-R01_EN"
-                    
+        $ChromeBetaver = "147.0.7727.3"
 
-            }
-                    
-                else
-                     
-                {
-                Write-Log -Message "The latest version of Google Chrome is already installed."
-                        
-            }
+        if ([Version]$DisplayVersion -lt [Version]$ChromeBetaver) { 
 
-
-        } 
-                
-                
-        else
-                
+            if ((gwmi win32_operatingsystem | select osarchitecture).osarchitecture -eq "64-bit")
             {
-            # Chrome is not installed
-            Write-Log -Message "Google Chrome is not installed. Starting installation..."
-            Execute-MSI -Action 'Install' -Path "$dirFiles\googlechromestandaloneenterprise64.msi" -Transform "$dirFiles\Google_Chrome_147.0.7727.56-R01_EN.Mst" -Parameters '/qn' -LogName "_Google_Chrome_147.0.7727.56-R01_EN"
+
+                Write-Log -Message " 64bit Installation"
+
+                TASKKILL /F /IM "chrome.exe"
+
+                Execute-MSI -Action 'Install' -Path "$dirFiles\googlechromebetastandaloneenterprise64.msi" -Transform "$dirFiles\Google_ChromeBeta_147.0.7727.3_x64_EN.Mst" -Parameters '/qn /norestart' -LogName 'Google_ChromeBeta_147.0.7727.3_x64_EN'
+
+                If (Test-Path -path "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{8237E44A-0054-442C-B6B6-EA0509993955}")
+                {                                                                               
+
+                Remove-Item -path "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{8237E44A-0054-442C-B6B6-EA0509993955}" -Force -Recurse
+                }
             }
-            
+
+            else 
+            {
+
+                Write-Log -Message " 32bit Installation"
+
+                TASKKILL /F /IM "chrome.exe"
+
+                Execute-MSI -Action 'Install' -Path "$dirFiles\googlechromebetastandaloneenterprise.msi" -Transform "$dirFiles\Google_ChromeBeta_147.0.7727.3_x86_EN.Mst" -Parameters '/qn /norestart' -LogName 'Google_ChromeBeta_147.0.7727.3_x86_EN'
+
+                If (Test-Path -path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Active Setup\Installed Components\{8237E44A-0054-442C-B6B6-EA0509993955}"){
+                                                                                                                                                                                              
+                Remove-Item -path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Active Setup\Installed Components\{8237E44A-0054-442C-B6B6-EA0509993955}" -Force -Recurse
+                }
+            }
+
+        }
+
+
 
         ##*===============================================
         ##* POST-INSTALLATION
@@ -361,7 +260,33 @@ Try {
 
         ## <Perform Post-Installation tasks here>
 
-        Audit-Key -Action "Create"
+        $items = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*","HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" | Where-Object {($_.DisplayName -like "Google Chrome Beta")}
+
+        $DisplayVersion = $items.DisplayVersion
+
+        if ([Version]$DisplayVersion -ge [Version]$ChromeBetaver) 
+        {
+
+            Write-Log -Message " Installation Sucessful "
+                
+            New-Item -Path "HKLM:\Software" -Name "Ahold" -erroraction silentlycontinue
+            New-Item -Path "HKLM:\Software\Ahold" -Name "GoogleChromeBeta" -erroraction silentlycontinue
+            Set-ItemProperty -Path "HKLM:\Software\Ahold\GoogleChromeBeta" -Name "Version"  -Type String -Value "147.0.7727.3" -erroraction silentlycontinue
+
+            Write-Log -Message " Detection registry added successfully "
+                
+        }
+
+        else 
+        {
+
+            Write-Log -Message " Installation failed"
+                
+            Exit 69001
+                
+        }
+
+        #Audit-Key -Action "Create"
 
         ## Display a message at the end of the install
         #If (-not $useDefaultMsi) {
@@ -382,29 +307,6 @@ Try {
 
         ## <Perform Pre-Uninstallation tasks here>
 
-       # Kill Chrome if it's running
-        Write-Log -Message "Checking if Chrome is running in the machine..."
-        $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
-        if ($chromeProcesses) {
-            Write-Log -Message "Chrome.exe is running in the machine..."
-            Stop-Process -Name "chrome" -Force
-            Write-Log -Message "Terminated chrome.exe..."
-        }
-        Write-Log -Message "Now Chrome is not running in the machine..."
-
-
-
-
-        # Kill GoogleUpdate.exe if it's running
-        Write-Log -Message "Checking if GoogleUpdate.exe is running in the machine..."
-        $googleUpdateProcesses = Get-Process -Name "GoogleUpdate" -ErrorAction SilentlyContinue
-        if ($googleUpdateProcesses) {
-            Write-Log -Message "GoogleUpdate.exe is running in the machine..."
-            Stop-Process -Name "GoogleUpdate" -Force
-            Write-Log -Message "Terminated GoogleUpdate.exe..."
-        }
-   
-        Write-Log -Message "Now GoogleUpdate.exe is not running in the machine..."
 
         ##*===============================================
         ##* UNINSTALLATION
@@ -421,26 +323,26 @@ Try {
 
         ## <Perform Uninstallation tasks here>
 
-            
-        # Proceed to remove Google Chrome
-        Write-Log -Message "*************************************************************"
-        Write-Log -Message "Removal of Google Chrome started......."
-        Write-Log -Message "*************************************************************"
+        if ((test-path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{7A604C90-3628-3B89-AB24-FE3DAF0C0BB8}") -or (test-path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{B0EC609F-EFB8-3E5E-A25D-9916641A2B52}")) {
 
-        $RegUninstallPath = @(
-            'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
-        )
-        $UninstallSearchFilter = { ($_.GetValue('DisplayName') -like '*Google Chrome*') } 
-        
-        foreach ($Path in $RegUninstallPath) {
-            if (Test-Path -Path $Path) {
-                Get-ChildItem $Path | Where-Object $UninstallSearchFilter | 
-                ForEach-Object {
-                Execute-MSI -Action 'Uninstall' -Path "$($_.PSChildName)" -Parameters '/qn' -LogName "_Google_Chrome_147.0.7727.56-R01_EN"                     
+            if ((gwmi win32_operatingsystem | select osarchitecture).osarchitecture -eq "64-bit")  {
 
-                }
+                Write-Log -Message " 64bit Uninstallation"
+
+                Execute-MSI -Action 'Uninstall' -Path '{7A604C90-3628-3B89-AB24-FE3DAF0C0BB8}' -Parameters '/qn ' -LogName 'Google_ChromeBeta_147.0.7727.3_x64_EN'
             }
+
+
+            else {
+
+                Write-Log -Message " 32bit Uninstallation"
+
+                Execute-MSI -Action 'Uninstall' -Path '{B0EC609F-EFB8-3E5E-A25D-9916641A2B52}' -Parameters '/qn ' -LogName 'Google_ChromeBeta_147.0.7727.3_x64_EN'
+            }
+
+
         }
+
 
         ##*===============================================
         ##* POST-UNINSTALLATION
@@ -449,17 +351,26 @@ Try {
 
         ## <Perform Post-Uninstallation tasks here>
 
-        $FolderName1 = "$envProgramFiles\Google\Chrome"
-        if (Test-Path $FolderName1) {
-        Remove-Folder -Path "$envProgramFiles\Google\Chrome"
+
+        if (-NOT ((test-path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{7A604C90-3628-3B89-AB24-FE3DAF0C0BB8}") -or (test-path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{B0EC609F-EFB8-3E5E-A25D-9916641A2B52}"))) {
+
+            Write-Log -Message " Uninstallation Sucessfull "
+                
+            Remove-Item -Path "HKLM:\Software\Ahold\GoogleChromeBeta" -force
+
+            Write-Log -Message " Detection registry removed successfully "
+
+        }
+                
+        else {
+
+            Write-Log -Message " Uninstallation failed"
+                
+            Exit 69001
+                
         }
 
-        $FolderName2 = "$envProgramFilesX86\Google\Update"
-        if (Test-Path $FolderName2) {
-        Remove-Folder -Path "$envProgramFilesX86\Google\Update*"
-        }
-      
-        Audit-Key -Action "Delete"
+        #Audit-Key -Action "Delete"
 
 
     }
