@@ -1,0 +1,543 @@
+<#
+.SYNOPSIS
+	This script performs the installation or uninstallation of an application(s).
+	# LICENSE #
+	PowerShell App Deployment Toolkit - Provides a set of functions to perform common application deployment tasks on Windows. 
+	Copyright (C) 2017 - Sean Lillis, Dan Cunningham, Muhammad Mashwani, Aman Motazedian.
+	This program is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation, either version 3 of the License, or any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. 
+	You should have received a copy of the GNU Lesser General Public License along with this program. If not, see <http://www.gnu.org/licenses/>.
+.DESCRIPTION
+	The script is provided as a template to perform an install or uninstall of an application(s).
+	The script either performs an "Install" deployment type or an "Uninstall" deployment type.
+	The install deployment type is broken down into 3 main sections/phases: Pre-Install, Install, and Post-Install.
+	The script dot-sources the AppDeployToolkitMain.ps1 script which contains the logic and functions required to install or uninstall an application.
+.PARAMETER DeploymentType
+	The type of deployment to perform. Default is: Install.
+.PARAMETER DeployMode
+	Specifies whether the installation should be run in Interactive, Silent, or NonInteractive mode. Default is: Interactive. Options: Interactive = Shows dialogs, Silent = No dialogs, NonInteractive = Very silent, i.e. no blocking apps. NonInteractive mode is automatically set if it is detected that the process is not user interactive.
+.PARAMETER AllowRebootPassThru
+	Allows the 3010 return code (requires restart) to be passed back to the parent process (e.g. SCCM) if detected from an installation. If 3010 is passed back to SCCM, a reboot prompt will be triggered.
+.PARAMETER TerminalServerMode
+	Changes to "user install mode" and back to "user execute mode" for installing/uninstalling applications for Remote Destkop Session Logs/Citrix servers.
+.PARAMETER DisableLogging
+	Disables logging to file for the script. Default is: $false.
+.EXAMPLE
+    powershell.exe -Command "& { & '.\Deploy-Application.ps1' -DeployMode 'Silent'; Exit $LastExitCode }"
+.EXAMPLE
+    powershell.exe -Command "& { & '.\Deploy-Application.ps1' -AllowRebootPassThru; Exit $LastExitCode }"
+.EXAMPLE
+    powershell.exe -Command "& { & '.\Deploy-Application.ps1' -DeploymentType 'Uninstall'; Exit $LastExitCode }"
+.EXAMPLE
+    Deploy-Application.exe -DeploymentType "Install" -DeployMode "Silent"
+.NOTES
+	Toolkit Exit Code Ranges:
+	60000 - 68999: Reserved for built-in exit codes in Deploy-Application.ps1, Deploy-Application.exe, and AppDeployToolkitMain.ps1
+	69000 - 69999: Recommended for user customized exit codes in Deploy-Application.ps1
+	70000 - 79999: Recommended for user customized exit codes in AppDeployToolkitExtensions.ps1
+.LINK 
+	http://psappdeploytoolkit.com
+#>
+[CmdletBinding()]
+Param (
+	[Parameter(Mandatory=$false)]
+	[ValidateSet('Install','Uninstall')]
+	[string]$DeploymentType = 'Install',
+	[Parameter(Mandatory=$false)]
+	[ValidateSet('Interactive','Silent','NonInteractive')]
+	[string]$DeployMode = 'Silent',
+	[Parameter(Mandatory=$false)]
+	[switch]$AllowRebootPassThru = $false,
+	[Parameter(Mandatory=$false)]
+	[switch]$TerminalServerMode = $false,
+	[Parameter(Mandatory=$false)]
+	[switch]$DisableLogging = $false
+)
+
+Try {
+	## Set the script execution policy for this process
+	Try { Set-ExecutionPolicy -ExecutionPolicy 'ByPass' -Scope 'Process' -Force -ErrorAction 'Stop' } Catch {}
+	
+	##*===============================================
+	##* VARIABLE DECLARATION
+	##*===============================================
+	## Variables: Application
+	[string]$appVendor = 'Mozilla'
+	[string]$appName = 'Firefox'
+	[string]$appVersion = '147.0.3'
+	[string]$appArch = 'x64'
+	[string]$appLang = 'EN'
+	[string]$appRevision = '01'
+    [string]$DevTrackID = 'NSI871'
+	[string]$appScriptVersion = '1.0.0'
+	[string]$appScriptDate = '11/02/2026'
+	[string]$appScriptAuthor = 'DXC-SWM-KC'
+	##*===============================================
+	## Variables: Install Titles (Only set here to override defaults set by the toolkit)
+	[string]$installName = ''
+	[string]$installTitle = ''
+	
+	##* Do not modify section below
+	#region DoNotModify
+	
+	## Variables: Exit Code
+	[int32]$mainExitCode = 0
+	
+	## Variables: Script
+	[string]$deployAppScriptFriendlyName = 'Deploy Application'
+	[version]$deployAppScriptVersion = [version]'3.7.0'
+	[string]$deployAppScriptDate = '02/13/2018'
+	[hashtable]$deployAppScriptParameters = $psBoundParameters
+	
+	## Variables: Environment
+	If (Test-Path -LiteralPath 'variable:LogInvocation') { $InvocationInfo = $LogInvocation } Else { $InvocationInfo = $MyInvocation }
+	[string]$scriptDirectory = Split-Path -Path $InvocationInfo.MyCommand.Definition -Parent
+	
+	## Dot source the required App Deploy Toolkit Functions
+	Try {
+		[string]$moduleAppDeployToolkitMain = "$scriptDirectory\AppDeployToolkit\AppDeployToolkitMain.ps1"
+		If (-not (Test-Path -LiteralPath $moduleAppDeployToolkitMain -PathType 'Leaf')) { Throw "Module does not exist at the specified location [$moduleAppDeployToolkitMain]." }
+		If ($DisableLogging) { . $moduleAppDeployToolkitMain -DisableLogging } Else { . $moduleAppDeployToolkitMain }
+	}
+	Catch {
+		If ($mainExitCode -eq 0){ [int32]$mainExitCode = 60008 }
+		Write-Error -Message "Module [$moduleAppDeployToolkitMain] failed to load: `n$($_.Exception.Message)`n `n$($_.InvocationInfo.PositionMessage)" -ErrorAction 'Continue'
+		## Exit the script, returning the exit code to SCCM
+		If (Test-Path -LiteralPath 'variable:LogInvocation') { $script:ExitCode = $mainExitCode; Exit } Else { Exit $mainExitCode }
+	}
+	
+	#endregion
+	##* Do not modify section above
+	##*===============================================
+	##* END VARIABLE DECLARATION
+	##*===============================================
+		
+	If ($deploymentType -ine 'Uninstall') {
+		##*===============================================
+		##* PRE-INSTALLATION
+		##*===============================================
+		[string]$installPhase = 'Pre-Installation'
+
+		
+		## <Perform Pre-Installation tasks here>
+
+        TASKKILL /F /IM "firefox.exe"
+
+        # Define uninstall paths
+        $uninstallPaths = @(
+            "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+            "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+        )
+
+        # Minimum allowed version
+        $minVersion = [version]"147.0.3"
+
+        Write-Log "Starting Firefox uninstall check..."
+        Write-Log "Minimum allowed version: $minVersion"
+
+        $firefoxFound = $false
+
+        foreach ($path in $uninstallPaths) {
+        Get-ItemProperty $path -ErrorAction SilentlyContinue |
+        Where-Object { $_.DisplayName -like "*Mozilla Firefox*" -and $_.DisplayVersion } |
+        ForEach-Object {
+        $firefoxFound = $true
+        $appName = $_.DisplayName
+        $version = $_.DisplayVersion
+        $uninstallCmd = $_.UninstallString
+
+        try { $verObj = [version]$version } catch {
+            Write-Log "Invalid Firefox version format, skipping."
+            return
+        }
+
+        if ($verObj -lt $minVersion) {
+            Write-Log "Firefox version $version is lower than $minVersion. Proceeding with uninstallation"
+
+            # --- Uninstall Firefox ---
+            if ($uninstallCmd) {
+                if ($uninstallCmd -like "MsiExec.exe*") {
+                    if ($uninstallCmd -match "({.*})") {
+                        $guid = $matches[1]
+                        Execute-MSI -Action 'Uninstall' -Path $guid -Parameters "/qn" -Wait
+                    }
+                } else {
+                    if ($uninstallCmd -match '^\s*(".*?"|\S+)(.*)$') {
+                        $exePath = $matches[1].Trim('"')
+                        $exeArgs = $matches[2].Trim()
+                        if ($exeArgs -notmatch "/[sS]") { $exeArgs += " /S" }
+                         Execute-Process -Path $exePath -Parameters $exeArgs -Wait
+                    }
+                }
+            }
+
+            Start-Sleep -Seconds 10
+            Write-Log "Firefox uninstall complete."
+
+            # --- Uninstall Mozilla Maintenance Service ---
+            foreach ($key in $uninstallPaths) {
+                Get-ItemProperty $key -ErrorAction SilentlyContinue |
+                Where-Object { $_.DisplayName -like "*Mozilla Maintenance Service*" -and $_.DisplayVersion } |
+                ForEach-Object {
+                    $maintVersion = $_.DisplayVersion
+                    try { [version]$maintVersion } catch { return }
+                    $uninstallCmd = $_.UninstallString
+                    if ($uninstallCmd -match '^\s*"?(.+?\.exe)"?\s*(.*)$') {
+                        $exePath = $matches[1]
+                        $exeArgs = $matches[2]
+                        if ($exeArgs -notmatch "/[sS]") { $exeArgs += " /S" }
+                        if (Test-Path $exePath) {
+                            Execute-Process -Path $exePath -Parameters $exeArgs -Wait
+                        }
+                    }
+                    Write-Log "Mozilla Maintenance Service uninstalled."
+                }
+            }
+            Start-Sleep -Seconds 10
+
+            # --- Remove files & folders ---
+            $pathsToRemove = @(
+                "$env:ProgramFiles\Mozilla Firefox\Mozilla.cfg",
+                "$env:ProgramFiles\Mozilla Firefox"
+            )
+            foreach ($p in $pathsToRemove) {
+                if (Test-Path $p) {
+                    Remove-Item $p -Force -Recurse
+                    Write-Log "Removed: $p"
+                } else {
+                    Write-Log "Path not found, skipping: $p"
+                }
+            }
+
+            Start-Sleep -Seconds 10
+
+            # --- Remove registry keys ---
+            $regKeys = @(
+                "HKLM:\SOFTWARE\Mozilla\firefox",
+                "HKLM:\SOFTWARE\Mozilla\*",
+                "HKLM:\SOFTWARE\mozilla.org\Mozilla",
+                "HKLM:\SOFTWARE\WOW6432Node\Mozilla\Firefox",
+                "HKLM:\SOFTWARE\DXC\Packages\NSI814",
+                "HKLM:\SOFTWARE\DXC\Packages\NSI830",
+                "HKLM:\SOFTWARE\DXC\Packages\NSI843",
+                "HKLM:\SOFTWARE\DXC\Packages\NSI855",
+                "HKLM:\SOFTWARE\DXC\Packages\NSI868"
+            )
+            foreach ($rk in $regKeys) {
+                if (Test-Path $rk) {
+                    Remove-Item $rk -Force -Recurse -ErrorAction SilentlyContinue
+                    Write-Log "Removed registry key: $rk"
+                } else {
+                    Write-Log "Registry key not found, skipping: $rk"
+                }
+            }
+            Start-Sleep -Seconds 10
+            Write-Log "All Firefox components removed."
+        }
+        else {
+            Write-Log "Firefox version $version meets requirement. Skipping uninstallation."
+        }
+    }
+}
+
+if (-not $firefoxFound) {
+    Write-Log "Firefox not found. Skipping uninstallation."
+}
+
+Start-Sleep -Seconds 10
+
+		
+		##*===============================================
+		##* INSTALLATION 
+		##*===============================================
+		[string]$installPhase = 'Installation'
+
+        [string]$Logdir = "$envWinDir\Logs"
+		
+		## <Perform Installation tasks here>
+
+     
+        $targetVersion = [version]"147.0.3"
+ 
+        function Get-FirefoxVersion {
+
+            $paths = @(
+
+                "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+
+                "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+
+            )
+
+            foreach ($path in $paths) {
+
+                $apps = Get-ItemProperty $path -ErrorAction SilentlyContinue |
+
+                    Where-Object { $_.DisplayName -like "*Mozilla Firefox*" -and $_.DisplayVersion }
+
+                foreach ($app in $apps) {
+
+                    try { return [version]$app.DisplayVersion } catch { }
+
+                }
+
+            }
+
+            return $null
+
+        }
+ 
+        $currentVersion = Get-FirefoxVersion
+ 
+        if ($currentVersion -and $currentVersion -ge $targetVersion) {
+
+            Write-Log "Firefox version is already $currentVersion (equal to or newer than $targetVersion). Skipping installation."
+            
+            Audit-Key -Action "Create"   
+            Exit-Script -ExitCode 0
+
+        }
+ 
+        Write-Log "Firefox is not installed. Proceeding with installation."
+
+        Execute-MSI -Action 'Install' -Path 'Firefox Setup 147.0.3.msi' -Parameters '/qn' -LogName 'NSI871_Mozilla_Firefox_147.0.3_EN_R01'
+
+
+        start-sleep -Seconds 30
+
+
+        Execute-MSI -Action 'Install' -Path 'Mozilla_Firefox_147.0.3_EN_R01.msi' -Parameters '/qn' -LogName 'NSI871_Mozilla_Firefox_147.0.3_EN_R01_Config'
+
+        start-sleep -Seconds 10
+
+
+        ##*===============================================
+        ##* POST-INSTALLATION
+		##*===============================================
+		[string]$installPhase = 'Post-Installation'
+		
+		## <Perform Post-Installation tasks here>
+
+        ############### Creating directory and copying ini file #####################
+
+        $ProfilePaths = Get-UserProfiles | Select-Object -ExpandProperty 'ProfilePath'
+
+        foreach ($Profile in $ProfilePaths) {
+            $firefoxFolderPath = Join-Path -Path $Profile -ChildPath 'AppData\Roaming\Mozilla\Firefox'
+
+            # Check if the Firefox folder exists in the user's profile
+            if (-not (Test-Path -Path $firefoxFolderPath -PathType Container)) {
+                New-Item -ItemType Directory -Path $firefoxFolderPath -Force
+                Write-Log -Message "Firefox Folder created."
+            } else {
+                Write-Log -Message "Firefox Folder already exists."
+            }
+
+             $profileIniPath = Join-Path -Path $firefoxFolderPath -ChildPath 'profiles.ini'
+            $installIniPath = Join-Path -Path $firefoxFolderPath -ChildPath 'installs.ini'
+
+            if (-not (Test-Path -Path $profileIniPath -PathType Leaf)) {
+                Copy-Item -Path "$dirfiles\profiles.ini" -Destination $firefoxFolderPath -Force
+                Write-Log -Message "profiles.ini File copied."
+            } else {
+                Write-Log -Message "profiles.ini already exists."
+            }
+
+            if (-not (Test-Path -Path $installIniPath -PathType Leaf)) {
+                Copy-Item -Path "$dirfiles\installs.ini" -Destination $firefoxFolderPath -Force
+                Write-Log -Message "installs.ini File copied."
+            } else {
+                Write-Log -Message "installs.ini already exists."
+            }
+        }
+
+        Start-Sleep -Seconds 5
+
+
+        ############### Dynamically checking the folder if not Creating directory and copying ini file #####################
+
+        $ProfilePaths = Get-UserProfiles | Select-Object -ExpandProperty 'ProfilePath'
+
+        foreach ($Profile in $ProfilePaths) {
+            $firefoxProfilesPath = Join-Path -Path $Profile -ChildPath 'AppData\Roaming\Mozilla\Firefox\Profiles'
+
+            # Ensure the Firefox Profiles folder exists or create it if it doesn't
+            if (-not (Test-Path -Path $firefoxProfilesPath -PathType Container)) {
+                New-Item -ItemType Directory -Path $firefoxProfilesPath -Force
+                Write-Log -Message "Created Firefox Profiles folder for new user."
+            }
+
+            # Get all subfolders (Firefox profiles) within the Profiles folder
+            $firefoxProfileFolders = Get-ChildItem -Path $firefoxProfilesPath -Directory
+
+            # Check if there is any folder with a name ending with '.default-release'
+            $existingDefaultReleaseFolder = $firefoxProfileFolders | Where-Object { $_.Name -match '\.default-release$' }
+
+            if (-not $existingDefaultReleaseFolder) {
+                # If no folder is found, create a new one
+                $newDefaultReleaseFolder = Join-Path -Path $firefoxProfilesPath -ChildPath '34qw24ia.default-release'
+                New-Item -ItemType Directory -Path $newDefaultReleaseFolder -Force
+                Write-Log -Message "Created folder for user that already has the firefox."
+
+                # Copy prefs.js to the newly created directory
+                $destinationFile = Join-Path -Path $newDefaultReleaseFolder -ChildPath 'prefs.js'
+                Copy-Item -Path "$dirfiles\prefs.js" -Destination $newDefaultReleaseFolder -Force  
+                #Copy-Item -Path "$dirfiles\prefs.js" -Destination $destinationFile -Force 
+                Write-Log -Message "prefs.js File copied for new user."
+            }
+
+            # Now, proceed with copying prefs.js to all existing folders
+            foreach ($firefoxProfileFolder in $firefoxProfileFolders) {
+                 $destinationFile= Join-Path -Path $firefoxProfileFolder.FullName -ChildPath 'prefs.js'
+
+                # Copy the prefs.js file to the Firefox profile folder, replacing if it already exists
+                if ($firefoxProfileFolder.Name -match '\.default-release$') {
+                    Copy-Item -Path "$dirfiles\prefs.js" -Destination $destinationFile -Force
+                    Write-Log -Message "prefs.js File replaced for user that already has the firefox."
+                } else {
+                    Write-Log -Message "Skipping prefs.js replacement for user that already has the firefox."
+                }
+            }
+        }
+
+           Start-Sleep -Seconds 5
+
+        #************************************ Copy file ***********************************************
+           $distributionPath = Join-Path "$envProgramFiles\Mozilla Firefox" "distribution"
+
+            # Check if the folder exists, if not create it
+            if (-not (Test-Path -Path $distributionPath -PathType Container)) {
+                New-Item -ItemType Directory -Path $distributionPath -Force | Out-Null
+                Write-Log -Message "Created Firefox distribution folder."
+            } else {
+                Write-Log -Message "Firefox distribution folder already exists."
+            }
+
+            # Copy the policies.json file
+            Copy-Item -Path "$dirfiles\policies.json" -Destination $distributionPath -Force
+            Write-Log -Message "policies.json file copied."
+
+
+        Start-Sleep -Seconds 5
+
+        
+       Audit-Key -Action "Create"       
+		
+	}
+	ElseIf ($deploymentType -ieq 'Uninstall')
+	{
+		##*===============================================
+		##* PRE-UNINSTALLATION
+		##*===============================================
+		[string]$installPhase = 'Pre-Uninstallation'	
+		
+		## <Perform Pre-Uninstallation tasks here>
+
+        TASKKILL /F /IM "firefox.exe"
+		
+		##*===============================================
+		##* UNINSTALLATION
+		##*===============================================
+		[string]$installPhase = 'Uninstallation'
+
+        [string]$Logdir = "$envWinDir\Logs"
+		
+		
+		# <Perform Uninstallation tasks here>    
+
+         Execute-MSI -Action 'Uninstall' -Path '{25B89649-B32B-46B9-9A1D-039C9EDB8F2D}' -Parameters '/qn' -LogName 'NSI871_Mozilla_Firefox_147.0.3_EN_R01_Config'       
+      
+         Execute-Process -Path "$envProgramFiles\Mozilla Firefox\uninstall\helper.exe" -Parameters '/s'
+ 
+         Execute-Process -Path "$envProgramFilesX86\Mozilla Maintenance Service\uninstall.exe" -Parameters '/S'
+        
+        
+         start-sleep -Seconds 10
+
+        ##*===============================================
+		##* POST-UNINSTALLATION
+		##*===============================================
+		[string]$installPhase = 'Post-Uninstallation'
+        
+		## <Perform Post-Uninstallation tasks here>
+
+
+        #------------------------------ Removing files & folders ---------------------------------#
+        
+        $file1="$envProgramFiles\Mozilla Firefox\Mozilla.cfg"
+        if (Test-Path $file1)
+        {
+        Remove-Item $file1 -Force -Recurse
+        }   
+        
+        start-sleep -Seconds 5
+
+        
+        $file2="$envProgramData\Microsoft\Windows\Start Menu\Programs\Firefox.lnk"
+        if (Test-Path $file2)
+        {
+        Remove-Item $file2 -Force -Recurse
+        }
+
+        
+        $file3="$envProgramData\Microsoft\Windows\Start Menu\Programs\Firefox Private Browsing.lnk"
+        if (Test-Path $file3)
+        {
+        Remove-Item $file3 -Force -Recurse
+        }
+      
+        start-sleep -Seconds 5
+
+        
+        $folder1 = "$envProgramFiles\Mozilla Firefox"
+        if (Test-Path $folder1) {
+        Remove-Item $folder1 -Force -Recurse
+        }
+
+        start-sleep -Seconds 5 #
+
+
+        #------------------------------ Removing registry keys ---------------------------------#
+        
+       
+        If (Test-Path -path "HKLM:\SOFTWARE\Mozilla\firefox"){
+        Remove-Item -path "HKLM:\SOFTWARE\Mozilla\firefox" -Force -Recurse
+        Write-Log -Message "Successfully Removed HKLM:\SOFTWARE\Mozilla\firefox"
+        }
+
+        
+        If (Test-Path -path "HKLM:\SOFTWARE\Mozilla"){
+        Remove-Item -path "HKLM:\SOFTWARE\Mozilla\*" -Force -Recurse
+        Write-Log -Message "Successfully Removed HKLM:\SOFTWARE\Mozilla\"
+        }
+
+        
+        If (Test-Path -path "HKLM:\SOFTWARE\mozilla.org\Mozilla"){
+        Remove-Item -path "HKLM:\SOFTWARE\mozilla.org\Mozilla" -Force -Recurse
+        Write-Log -Message "Successfully Removed HKLM:\SOFTWARE\mozilla.org\Mozilla"
+        }
+
+        
+        If(Test-Path -path "HKLM:\SOFTWARE\WOW6432Node\Mozilla\Firefox"){  
+        Remove-Item -path "HKLM:\SOFTWARE\WOW6432Node\Mozilla\Firefox" -Force -Recurse
+        Write-Log -Message "Successfully Removed HKLM:\SOFTWARE\WOW6432Node\Mozilla\Firefox"
+        }
+
+
+        Audit-Key -Action "Delete" 
+
+        }
+	
+	##*===============================================
+	##* END SCRIPT BODY
+	##*===============================================
+	
+	## Call the Exit-Script function to perform final cleanup operations
+	Exit-Script -ExitCode $mainExitCode
+}
+Catch {
+	[int32]$mainExitCode = 60001
+	[string]$mainErrorMessage = "$(Resolve-Error)"
+	Write-Log -Message $mainErrorMessage -Severity 3 -Source $deployAppScriptFriendlyName
+	Show-DialogBox -Text $mainErrorMessage -Icon 'Stop'
+	Exit-Script -ExitCode $mainExitCode
+}
