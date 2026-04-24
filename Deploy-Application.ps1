@@ -269,9 +269,9 @@ Try {
 
             Write-Log -Message " Installation Sucessful "
                 
-            New-Item -Path "HKLM:\Software" -Name "Ahold" -erroraction silentlycontinue
-            New-Item -Path "HKLM:\Software\Ahold" -Name "GoogleChromeBeta" -erroraction silentlycontinue
-            Set-ItemProperty -Path "HKLM:\Software\Ahold\GoogleChromeBeta" -Name "Version"  -Type String -Value "147.0.7727.3" -erroraction silentlycontinue
+            New-Item -Path "HKLM:\Software" -Name "" -erroraction silentlycontinue
+            New-Item -Path "HKLM:\Software\" -Name "GoogleChromeBeta" -erroraction silentlycontinue
+            Set-ItemProperty -Path "HKLM:\Software\\GoogleChromeBeta" -Name "Version"  -Type String -Value "147.0.7727.3" -erroraction silentlycontinue
 
             Write-Log -Message " Detection registry added successfully "
                 
@@ -356,7 +356,7 @@ Try {
 
             Write-Log -Message " Uninstallation Sucessfull "
                 
-            Remove-Item -Path "HKLM:\Software\Ahold\GoogleChromeBeta" -force
+            Remove-Item -Path "HKLM:\Software\\GoogleChromeBeta" -force
 
             Write-Log -Message " Detection registry removed successfully "
 
