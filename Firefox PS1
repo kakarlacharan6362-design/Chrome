@@ -67,10 +67,10 @@ Try {
 	[string]$appArch = 'x64'
 	[string]$appLang = 'EN'
 	[string]$appRevision = '01'
-    [string]$DevTrackID = 'NSI871'
+    [string]$DevTrackID = ''
 	[string]$appScriptVersion = '1.0.0'
 	[string]$appScriptDate = '11/02/2026'
-	[string]$appScriptAuthor = 'DXC-SWM-KC'
+	[string]$appScriptAuthor = ''
 	##*===============================================
 	## Variables: Install Titles (Only set here to override defaults set by the toolkit)
 	[string]$installName = ''
@@ -216,11 +216,11 @@ Try {
                 "HKLM:\SOFTWARE\Mozilla\*",
                 "HKLM:\SOFTWARE\mozilla.org\Mozilla",
                 "HKLM:\SOFTWARE\WOW6432Node\Mozilla\Firefox",
-                "HKLM:\SOFTWARE\DXC\Packages\NSI814",
-                "HKLM:\SOFTWARE\DXC\Packages\NSI830",
-                "HKLM:\SOFTWARE\DXC\Packages\NSI843",
-                "HKLM:\SOFTWARE\DXC\Packages\NSI855",
-                "HKLM:\SOFTWARE\DXC\Packages\NSI868"
+                "HKLM:\SOFTWARE\\Packages\NSI814",
+                "HKLM:\SOFTWARE\\Packages\NSI830",
+                "HKLM:\SOFTWARE\\Packages\NSI843",
+                "HKLM:\SOFTWARE\\Packages\NSI855",
+                "HKLM:\SOFTWARE\\Packages\NSI868"
             )
             foreach ($rk in $regKeys) {
                 if (Test-Path $rk) {
@@ -299,13 +299,13 @@ Start-Sleep -Seconds 10
  
         Write-Log "Firefox is not installed. Proceeding with installation."
 
-        Execute-MSI -Action 'Install' -Path 'Firefox Setup 147.0.3.msi' -Parameters '/qn' -LogName 'NSI871_Mozilla_Firefox_147.0.3_EN_R01'
+        Execute-MSI -Action 'Install' -Path 'Firefox Setup 147.0.3.msi' -Parameters '/qn' -LogName '_Mozilla_Firefox_147.0.3_EN_R01'
 
 
         start-sleep -Seconds 30
 
 
-        Execute-MSI -Action 'Install' -Path 'Mozilla_Firefox_147.0.3_EN_R01.msi' -Parameters '/qn' -LogName 'NSI871_Mozilla_Firefox_147.0.3_EN_R01_Config'
+        Execute-MSI -Action 'Install' -Path 'Mozilla_Firefox_147.0.3_EN_R01.msi' -Parameters '/qn' -LogName '_Mozilla_Firefox_147.0.3_EN_R01_Config'
 
         start-sleep -Seconds 10
 
@@ -444,7 +444,7 @@ Start-Sleep -Seconds 10
 		
 		# <Perform Uninstallation tasks here>    
 
-         Execute-MSI -Action 'Uninstall' -Path '{25B89649-B32B-46B9-9A1D-039C9EDB8F2D}' -Parameters '/qn' -LogName 'NSI871_Mozilla_Firefox_147.0.3_EN_R01_Config'       
+         Execute-MSI -Action 'Uninstall' -Path '{25B89649-B32B-46B9-9A1D-039C9EDB8F2D}' -Parameters '/qn' -LogName '_Mozilla_Firefox_147.0.3_EN_R01_Config'       
       
          Execute-Process -Path "$envProgramFiles\Mozilla Firefox\uninstall\helper.exe" -Parameters '/s'
  
